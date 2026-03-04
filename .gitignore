@@ -1,0 +1,14 @@
+# Credentials — never commit
+.garmin_config.json
+
+# Personal health data
+garmin_raw_data.json
+garmin_summary.json
+recaps/
+
+# Runtime logs
+logs/
+
+# Dependencies
+node_modules/
+package-lock.json
