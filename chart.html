@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garmin Recap — System Architecture</title>
+<style>
+:root {
+  --bg:          #0f1117;
+  --surface-1:   #141b26;
+  --surface-2:   #1e293b;
+  --surface-3:   #263548;
+  --border-1:    #1e293b;
+  --border-2:    #334155;
+  --border-3:    #475569;
+  --text-primary:   #f1f5f9;
+  --text-secondary: #e2e8f0;
+  --text-muted:     #94a3b8;
+  --text-dim:       #64748b;
+  --text-faint:     #475569;
+  --green:   #4ade80;
+  --green-bg: #14532d;
+  --green-text: #86efac;
+  --yellow:  #fbbf24;
+  --yellow-bg: #1a1700;
+  --yellow-border: #854d0e;
+  --yellow-text: #ca8a04;
+  --red:     #f87171;
+  --red-bg:  #7f1d1d;
+  --red-text: #fca5a5;
+  --blue-bg: #1e3a5f;
+  --blue-text: #93c5fd;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --font-label: 0.7rem;
+  --font-small:  0.72rem;
+  --font-body:   0.82rem;
+  --font-title:  0.9rem;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text-secondary); padding: 32px; }
+h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary); }
+.subtitle { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 32px; }
+.section-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin: 32px 0 12px; border-bottom: 1px solid var(--border-1); padding-bottom: 6px; }
+.flow { display: flex; gap: 0; align-items: stretch; margin-bottom: 40px; flex-wrap: wrap; }
+.flow-step { background: var(--surface-1); border: 1px solid var(--border-2); border-radius: var(--radius-lg); padding: 12px 16px; min-width: 130px; }
+.flow-step .label { font-size: var(--font-label); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin-bottom: 4px; }
+.flow-step .name { font-size: var(--font-title); font-weight: 600; color: var(--text-primary); }
+.flow-step .detail { font-size: var(--font-small); color: var(--text-muted); margin-top: 4px; }
+.flow-arrow { display: flex; align-items: center; padding: 0 8px; color: var(--text-faint); font-size: 1.1rem; }
+table { width: 100%; border-collapse: collapse; font-size: var(--font-body); margin-bottom: 32px; }
+th { text-align: left; font-size: var(--font-label); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); border-bottom: 1px solid var(--border-2); padding: 6px 12px 6px 0; }
+td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--border-1); color: var(--text-secondary); vertical-align: top; }
+td:first-child { font-family: monospace; font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+code { background: var(--surface-2); border-radius: var(--radius-sm); padding: 1px 5px; font-size: 0.75rem; color: var(--blue-text); }
+.note-card { background: var(--surface-1); border: 1px solid var(--border-2); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 10px; font-size: var(--font-body); line-height: 1.55; }
+.note-card-title { font-weight: 600; color: var(--text-primary); margin-bottom: 6px; font-size: var(--font-title); }
+.note-tag { display: inline-block; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; border-radius: 3px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
+.note-tag-fix  { background: var(--red-bg);   color: var(--red-text); }
+.note-tag-feat { background: var(--green-bg);  color: var(--green-text); }
+.note-tag-arch { background: var(--blue-bg);   color: var(--blue-text); }
+</style>
+</head>
+<body>
+<h1>Garmin Recap</h1>
+<p class="subtitle">Daily health recap automation &mdash; Alienware &middot; <code>/home/jd/.garmin-recap/</code> &middot; github.com/joseandgoose/garmin-daily-recap</p>
+
+<div class="section-title">Daily Flow</div>
+<div class="flow">
+  <div class="flow-step">
+    <div class="label">7:00 AM cron</div>
+    <div class="name">run_recap.sh</div>
+    <div class="detail">Orchestrator</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step">
+    <div class="label">Python</div>
+    <div class="name">garmin_fetch.py</div>
+    <div class="detail">Garmin Connect API via garth OAuth tokens</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step">
+    <div class="label">Python</div>
+    <div class="name">garmin_slim.py</div>
+    <div class="detail">250KB &rarr; 3KB summary JSON</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step">
+    <div class="label">Claude CLI</div>
+    <div class="name">Recap generation</div>
+    <div class="detail">Structured health summary</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step">
+    <div class="label">Node / Resend</div>
+    <div class="name">send-email.js</div>
+    <div class="detail">Delivered to Gmail</div>
+  </div>
+</div>
+
+<div class="section-title">Cron Schedule</div>
+<table>
+  <thead><tr><th>Schedule</th><th>Job</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>0 7 * * *</td><td><code>run_recap.sh</code></td><td>Fetch Garmin data, generate recap, send email</td></tr>
+    <tr><td>0 8 * * *</td><td><code>check-recap.sh</code></td><td>Failure alert if no recap file found by 8am</td></tr>
+  </tbody>
+</table>
+
+<div class="section-title">Metrics Fetched</div>
+<table>
+  <thead><tr><th>Metric</th><th>Source</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>user_summary</td><td>yesterday</td><td>Steps, calories, intensity minutes</td></tr>
+    <tr><td>sleep</td><td>today / yesterday fallback</td><td>Duration, score, stages</td></tr>
+    <tr><td>heart_rate</td><td>today</td><td>Resting + intraday</td></tr>
+    <tr><td>rhr</td><td>today</td><td>7-day rolling average</td></tr>
+    <tr><td>stress</td><td>today</td><td>0&ndash;100 score</td></tr>
+    <tr><td>body_battery</td><td>today</td><td>Energy reserve 0&ndash;100</td></tr>
+    <tr><td>training_status</td><td>today</td><td>Peaking / Maintaining / Detraining etc.</td></tr>
+    <tr><td>training_readiness</td><td>today</td><td>Readiness score</td></tr>
+    <tr><td>vo2max</td><td>today</td><td>Max metrics incl. VO2 max rating</td></tr>
+  </tbody>
+</table>
+
+<div class="section-title">Auth &mdash; garth OAuth Token Flow</div>
+<table>
+  <thead><tr><th>Step</th><th>Detail</th></tr></thead>
+  <tbody>
+    <tr><td>Token store</td><td><code>~/.garmin-recap/.garth_tokens/</code> &mdash; <code>oauth1_token.json</code> + <code>oauth2_token.json</code></td></tr>
+    <tr><td>Normal run</td><td><code>api.login(tokenstore=TOKENSTORE)</code> &mdash; no SSO call, reuses saved tokens</td></tr>
+    <tr><td>First seed / expiry</td><td>Login with credentials &rarr; <code>api.garth.dump(TOKENSTORE)</code> saves new tokens</td></tr>
+    <tr><td>Rate-limit (429)</td><td>Exit code 2 &rarr; <code>run_recap.sh</code> aborts immediately, no retries</td></tr>
+    <tr><td>Re-seed method</td><td>Run <code>garmin_seed_tokens.py</code> from Mac (different IP) with browser User-Agent</td></tr>
+  </tbody>
+</table>
+
+<div class="section-title">Changelog</div>
+
+<div class="note-card">
+  <div class="note-card-title">OAuth token persistence &mdash; no more daily SSO logins. <span class="note-tag note-tag-fix">fix</span></div>
+  <code>garmin_fetch.py</code> now saves garth OAuth tokens to <code>.garth_tokens/</code> after the first credential login and reuses them on every subsequent run. Eliminates daily calls to Garmin's SSO embed endpoint, which was triggering 429 rate-limits after the original 5-retry loop hammered the endpoint 5&times; in 5 minutes. Exit code 2 added for 429 responses so <code>run_recap.sh</code> aborts immediately instead of retrying. Tokens seeded from Mac using a browser User-Agent to bypass the account-level SSO block. <strong>v1.1.0</strong>
+</div>
+
+<div class="note-card">
+  <div class="note-card-title">Initial release &mdash; Garmin daily health recap automation. <span class="note-tag note-tag-feat">feat</span></div>
+  Daily pipeline: <code>garmin_fetch.py</code> pulls 9 health metrics from Garmin Connect, <code>garmin_slim.py</code> condenses 250KB raw JSON to ~3KB, Claude CLI generates a structured recap (Focus Mode, Body Battery, Sleep, RHR, Stress, VO2 Max, Activity), <code>send-email.js</code> delivers via Resend to Gmail. Runs at 7am via cron; <code>check-recap.sh</code> sends a failure alert at 8am if no file is found. <strong>v1.0.0</strong>
+</div>
+
+</body>
+</html>
