@@ -1,6 +1,8 @@
-#!/bin/zsh
+#!/bin/bash
 # Garmin Daily Health Recap Runner
-# Runs at 7am via launchd. Fetches Garmin data then calls Claude to generate recap.
+# Runs at 7am via cron on alienware (Linux). No GUI notifications.
+
+export PATH="/home/jd/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
 BASE="$HOME/.garmin-recap"
 TODAY=$(date +%Y-%m-%d)
@@ -11,16 +13,32 @@ LOG="$LOG_DIR/recap-$TODAY.log"
 
 echo "[$(date)] ===== Garmin Recap Started =====" >> "$LOG"
 
-# Step 1: Fetch raw data from Garmin Connect
-echo "[$(date)] Fetching data from Garmin..." >> "$LOG"
-python3 "$BASE/garmin_fetch.py" >> "$LOG" 2>&1
+# Step 1: Fetch raw data from Garmin Connect (with retry on network failure)
+MAX_ATTEMPTS=5
+RETRY_DELAY=60
+ATTEMPT=1
 
-if [ $? -ne 0 ]; then
-  echo "[$(date)] ERROR: Garmin fetch failed. Aborting." >> "$LOG"
-  exit 1
-fi
+while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+  echo "[$(date)] Fetching data from Garmin (attempt $ATTEMPT/$MAX_ATTEMPTS)..." >> "$LOG"
+  python3 "$BASE/garmin_fetch.py" >> "$LOG" 2>&1
+  FETCH_EXIT=$?
+  if [ $FETCH_EXIT -eq 0 ]; then
+    break
+  fi
+  if [ $FETCH_EXIT -eq 2 ]; then
+    echo "[$(date)] ERROR: Garmin SSO rate-limited (429). Aborting." >> "$LOG"
+    exit 2
+  fi
+  if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+    echo "[$(date)] ERROR: Garmin fetch failed after $MAX_ATTEMPTS attempts. Aborting." >> "$LOG"
+    exit 1
+  fi
+  echo "[$(date)] Fetch failed. Retrying in ${RETRY_DELAY}s..." >> "$LOG"
+  sleep $RETRY_DELAY
+  ATTEMPT=$((ATTEMPT + 1))
+done
 
-# Step 2: Slim the raw JSON down to only the fields needed for the recap
+# Step 2: Slim the raw JSON
 echo "[$(date)] Slimming data..." >> "$LOG"
 python3 "$BASE/garmin_slim.py" >> "$LOG" 2>&1
 
@@ -31,7 +49,7 @@ fi
 
 echo "[$(date)] Generating recap with Claude..." >> "$LOG"
 
-# Step 3: Read slimmed JSON and inject into prompt
+# Step 3: Build prompt and run Claude
 RAW_DATA=$(cat "$BASE/garmin_summary.json")
 PROMPT_FILE=$(mktemp /tmp/garmin-prompt-XXXXXX.txt)
 RECAP_FILE="$RECAP_DIR/garmin-recap-$TODAY.md"
@@ -63,42 +81,38 @@ RULES:
 FORMAT (only include sections with available data):
 
 ---
-# 🏃 Daily Health Recap — $TODAY
+# Daily Health Recap - $TODAY
 
-## 💡 Today's Focus: **[FOCUS MODE]**
-[2-3 sentences. Name the focus. State the highest-value action with specific numbers.
-If recovery and fitness signals conflict, briefly explain the tradeoff.]
+## Today's Focus: [FOCUS MODE]
+[2-3 sentences. Name the focus. State the highest-value action with specific numbers.]
 
-## 🔋 Body Battery
-**[SCORE] / 100** — [one sentence on what this means for the day]
+## Body Battery
+[SCORE] / 100 - [one sentence on what this means for the day]
 
-## 😴 Sleep
-**[DURATION] · Score [SCORE]/100 ([QUALITY])** · [BEDTIME] → [WAKE]
-[Only areas needing improvement + a specific fix. Skip if all stages are rated Good or Excellent.]
+## Sleep
+[DURATION] - Score [SCORE]/100 ([QUALITY]) - [BEDTIME] to [WAKE]
+[Only areas needing improvement + a specific fix.]
 
-## ❤️ Resting Heart Rate
-**[VALUE] BPM** · 7-day avg: [VALUE] BPM — [one-sentence interpretation]
+## Resting Heart Rate
+[VALUE] BPM - 7-day avg: [VALUE] BPM - [one-sentence interpretation]
 
-## 🧠 Stress
-**[SCORE] / 100 — [LEVEL].**
-Scale: 0–25 Resting · 26–50 Low · 51–75 Medium · 76–100 High
+## Stress
+[SCORE] / 100 - [LEVEL].
+Scale: 0-25 Resting - 26-50 Low - 51-75 Medium - 76-100 High
 
-## 🫁 VO₂ Max · Training Status · Fitness Age
-[Lead with what to do. Then: VO2 value + rating, Training Status + Load Focus,
-Fitness Age vs actual vs target.]
+## VO2 Max / Training Status / Fitness Age
+[Lead with what to do. Then: VO2 value + rating, Training Status, Fitness Age vs actual vs target.]
 
-## 📊 Yesterday's Activity
-**Steps:** [VALUE] / [GOAL] · **Intensity Minutes:** [VALUE] / [GOAL] · **Calories:** [VALUE] ([active] active · [resting] resting)
+## Yesterday's Activity
+Steps: [VALUE] / [GOAL] - Intensity Minutes: [VALUE] / [GOAL] - Calories: [VALUE]
 
 ---
-*Data from Garmin Connect · $TODAY*
+Data from Garmin Connect - $TODAY
 
 Write the completed recap to: $RECAP_FILE
 PROMPT
 
-# Step 3: Run Claude with the prompt (data is embedded — no browser or file access needed)
-# --allowedTools pre-approves the Write tool so launchd runs unattended at 7am
-claude -p "$(cat "$PROMPT_FILE")" --allowedTools "Write" >> "$LOG" 2>&1
+env -u CLAUDECODE claude -p "$(cat "$PROMPT_FILE")" --allowedTools "Write" >> "$LOG" 2>&1
 STATUS=$?
 rm -f "$PROMPT_FILE"
 
@@ -115,21 +129,6 @@ if [ $STATUS -eq 0 ]; then
   fi
 
   echo "[$(date)] ===== Done =====" >> "$LOG"
-
-  # Step 5: Show macOS popup — clicking "Open in Terminal" launches Terminal with the recap
-  osascript << APPLESCRIPT >> "$LOG" 2>&1
-try
-  set cmd to "cat $RECAP_FILE"
-  set dialogResult to display dialog "Your Garmin health recap for $TODAY is ready." & return & return & "To read it, run:" & return & cmd with title "🏃 Garmin Daily Recap" buttons {"Dismiss", "Open in Terminal"} default button "Open in Terminal"
-  if button returned of dialogResult is "Open in Terminal" then
-    tell application "Terminal"
-      activate
-      do script cmd
-    end tell
-  end if
-end try
-APPLESCRIPT
-
 else
   echo "[$(date)] ERROR: Claude step failed. Check log." >> "$LOG"
   exit 1
