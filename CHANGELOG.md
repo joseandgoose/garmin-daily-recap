@@ -1,5 +1,16 @@
 # Changelog — Garmin Recap
 
+## v1.2.0 — 2026-03-31
+
+### Changed
+- Replaced `send-email.js` (Node.js / Resend SDK) with `send_email.py` (Python stdlib). Node runtime fully removed.
+- Extracted Claude prompt from `run_recap.sh` into standalone `prompt.md` for easier iteration.
+- Consolidated Garmin credentials from `.garmin_config.json` into `.env.local` (single secrets file).
+- Emails now sent from `market@joseandgoose.com` instead of Resend sandbox address.
+
+### Fixed
+- `fitness_age` metric: updated API call from `get_fitnessage()` to `get_fitnessage_data(TODAY)` — all 10 metrics now fetching.
+
 ## v1.1.0 — 2026-03-27
 
 ### Fixed

@@ -89,12 +89,12 @@ code { background: var(--surface-2); border-radius: var(--radius-sm); padding: 1
   <div class="flow-step">
     <div class="label">Claude CLI</div>
     <div class="name">Recap generation</div>
-    <div class="detail">Structured health summary</div>
+    <div class="detail">Prompt from prompt.md</div>
   </div>
   <div class="flow-arrow">&rarr;</div>
   <div class="flow-step">
-    <div class="label">Node / Resend</div>
-    <div class="name">send-email.js</div>
+    <div class="label">Python / Resend</div>
+    <div class="name">send_email.py</div>
     <div class="detail">Delivered to Gmail</div>
   </div>
 </div>
@@ -120,6 +120,7 @@ code { background: var(--surface-2); border-radius: var(--radius-sm); padding: 1
     <tr><td>body_battery</td><td>today</td><td>Energy reserve 0&ndash;100</td></tr>
     <tr><td>training_status</td><td>today</td><td>Peaking / Maintaining / Detraining etc.</td></tr>
     <tr><td>training_readiness</td><td>today</td><td>Readiness score</td></tr>
+    <tr><td>fitness_age</td><td>today</td><td>Fitness age estimate</td></tr>
     <tr><td>vo2max</td><td>today</td><td>Max metrics incl. VO2 max rating</td></tr>
   </tbody>
 </table>
@@ -139,13 +140,18 @@ code { background: var(--surface-2); border-radius: var(--radius-sm); padding: 1
 <div class="section-title">Changelog</div>
 
 <div class="note-card">
+  <div class="note-card-title">Python-only stack, fitness_age fix, prompt extraction. <span class="note-tag note-tag-arch">arch</span></div>
+  Replaced <code>send-email.js</code> (Node/Resend SDK) with <code>send_email.py</code> (Python stdlib <code>urllib</code>) &mdash; Node runtime fully removed. Extracted Claude prompt from <code>run_recap.sh</code> into <code>prompt.md</code> for easier iteration. Consolidated Garmin credentials from <code>.garmin_config.json</code> into <code>.env.local</code>. Fixed <code>fitness_age</code> API call (<code>get_fitnessage</code> &rarr; <code>get_fitnessage_data</code>). Emails now sent from <code>market@joseandgoose.com</code>. <strong>v1.2.0</strong>
+</div>
+
+<div class="note-card">
   <div class="note-card-title">OAuth token persistence &mdash; no more daily SSO logins. <span class="note-tag note-tag-fix">fix</span></div>
   <code>garmin_fetch.py</code> now saves garth OAuth tokens to <code>.garth_tokens/</code> after the first credential login and reuses them on every subsequent run. Eliminates daily calls to Garmin's SSO embed endpoint, which was triggering 429 rate-limits after the original 5-retry loop hammered the endpoint 5&times; in 5 minutes. Exit code 2 added for 429 responses so <code>run_recap.sh</code> aborts immediately instead of retrying. Tokens seeded from Mac using a browser User-Agent to bypass the account-level SSO block. <strong>v1.1.0</strong>
 </div>
 
 <div class="note-card">
   <div class="note-card-title">Initial release &mdash; Garmin daily health recap automation. <span class="note-tag note-tag-feat">feat</span></div>
-  Daily pipeline: <code>garmin_fetch.py</code> pulls 9 health metrics from Garmin Connect, <code>garmin_slim.py</code> condenses 250KB raw JSON to ~3KB, Claude CLI generates a structured recap (Focus Mode, Body Battery, Sleep, RHR, Stress, VO2 Max, Activity), <code>send-email.js</code> delivers via Resend to Gmail. Runs at 7am via cron; <code>check-recap.sh</code> sends a failure alert at 8am if no file is found. <strong>v1.0.0</strong>
+  Daily pipeline: <code>garmin_fetch.py</code> pulls 10 health metrics from Garmin Connect, <code>garmin_slim.py</code> condenses 250KB raw JSON to ~3KB, Claude CLI generates a structured recap (Focus Mode, Body Battery, Sleep, RHR, Stress, VO2 Max, Activity), <code>send_email.py</code> delivers via Resend to Gmail. Runs at 7am via cron; <code>check-recap.sh</code> sends a failure alert at 8am if no file is found. <strong>v1.0.0</strong>
 </div>
 
 </body>
