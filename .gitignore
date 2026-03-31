@@ -1,14 +1,13 @@
 # Credentials — never commit
-.garmin_config.json
+.env.local
 
 # Personal health data
 garmin_raw_data.json
 garmin_summary.json
 recaps/
 
+# OAuth tokens
+.garth_tokens/
+
 # Runtime logs
 logs/
-
-# Dependencies
-node_modules/
-package-lock.json

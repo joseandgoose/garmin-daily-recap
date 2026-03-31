@@ -51,6 +51,11 @@ def first_device(nested):
     return next(iter(nested.values()), {})
 
 
+# Body battery: use today's raw data (more current than user_summary which is yesterday)
+bb_raw = m.get("body_battery")
+bb_entry = (bb_raw or [{}])[0] if isinstance(bb_raw, list) else {}
+bb_values = [v[1] for v in (bb_entry.get("bodyBatteryValuesArray") or []) if len(v) > 1 and v[1] is not None]
+
 ts = m.get("training_status") or {}
 ts_status = first_device((ts.get("mostRecentTrainingStatus") or {}).get("latestTrainingStatusData"))
 ts_load   = first_device((ts.get("mostRecentTrainingLoadBalance") or {}).get("metricsTrainingLoadBalanceDTOMap"))
@@ -61,13 +66,12 @@ slim = {
     "yesterday": raw.get("yesterday"),
 
     "body_battery": {
-        "at_wake": us.get("bodyBatteryAtWakeTime"),
-        "current": us.get("bodyBatteryMostRecentValue"),
-        "high": us.get("bodyBatteryHighestValue"),
-        "low": us.get("bodyBatteryLowestValue"),
-        "charged": us.get("bodyBatteryChargedValue"),
-        "drained": us.get("bodyBatteryDrainedValue"),
-        "charged_during_sleep": us.get("bodyBatteryDuringSleep"),
+        "current": bb_values[-1] if bb_values else None,
+        "high": max(bb_values) if bb_values else None,
+        "low": min(bb_values) if bb_values else None,
+        "charged": bb_entry.get("charged"),
+        "drained": bb_entry.get("drained"),
+        "charged_during_sleep": us.get("bodyBatteryDuringSleep"),  # from yesterday's summary
     },
 
     "sleep": {

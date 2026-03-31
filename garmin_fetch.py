@@ -7,26 +7,34 @@ Run this before the Claude recap step.
 
 import json
 import os
-import subprocess
 import sys
 from datetime import date, timedelta
 
-# Install garminconnect if missing
 try:
     from garminconnect import Garmin
 except ImportError:
-    print("Installing garminconnect...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "garminconnect", "-q"])
-    from garminconnect import Garmin
+    print("ERROR: garminconnect not installed. Run: pip install garminconnect")
+    sys.exit(1)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_FILE = os.path.join(BASE_DIR, ".garmin_config.json")
 OUTPUT_FILE = os.path.join(BASE_DIR, "garmin_raw_data.json")
 TOKENSTORE  = os.path.join(BASE_DIR, ".garth_tokens")
 
-# Load credentials
-with open(CONFIG_FILE) as f:
-    config = json.load(f)
+# Load credentials from .env.local
+env_file = os.path.join(BASE_DIR, ".env.local")
+env = {}
+with open(env_file) as f:
+    for line in f:
+        line = line.strip()
+        if "=" in line and not line.startswith("#"):
+            key, _, val = line.partition("=")
+            env[key.strip()] = val.strip()
+
+username = env.get("GARMIN_USERNAME")
+password = env.get("GARMIN_PASSWORD")
+if not username or not password:
+    print("ERROR: GARMIN_USERNAME and GARMIN_PASSWORD must be set in .env.local")
+    sys.exit(1)
 
 TODAY = date.today().isoformat()
 YESTERDAY = (date.today() - timedelta(days=1)).isoformat()
@@ -35,7 +43,7 @@ print(f"Fetching Garmin data for {TODAY}...")
 
 # Login — reuse saved OAuth tokens when available to avoid SSO rate limits.
 # Exit code 2 = rate-limited (caller should NOT retry; wait hours before trying again).
-api = Garmin(config["username"], config["password"])
+api = Garmin(username, password)
 try:
     api.login(tokenstore=TOKENSTORE)
     print("  Logged in via saved tokens")
@@ -60,10 +68,10 @@ def safe_fetch(name, fn):
     try:
         result = fn()
         data["metrics"][name] = result
-        print(f"  ✓ {name}")
+        print(f"  \u2713 {name}")
     except Exception as e:
         data["metrics"][name] = None
-        print(f"  ✗ {name}: {e}")
+        print(f"  \u2717 {name}: {e}")
 
 # Fetch each metric
 safe_fetch("user_summary",    lambda: api.get_user_summary(YESTERDAY))
@@ -79,7 +87,7 @@ safe_fetch("stress",             lambda: api.get_stress_data(TODAY))
 safe_fetch("body_battery",       lambda: api.get_body_battery(TODAY, TODAY))
 safe_fetch("training_status",    lambda: api.get_training_status(TODAY))
 safe_fetch("training_readiness", lambda: api.get_training_readiness(TODAY))
-safe_fetch("fitness_age",        lambda: api.get_fitnessage())
+safe_fetch("fitness_age",        lambda: api.get_fitnessage_data(TODAY))
 safe_fetch("vo2max",             lambda: api.get_max_metrics(TODAY))
 
 # Save
