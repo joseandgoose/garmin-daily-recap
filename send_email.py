@@ -21,7 +21,10 @@ with open(env_file) as f:
             env[key.strip()] = val.strip()
 
 RESEND_API_KEY = env.get("RESEND_API_KEY")
-NOTIFICATION_EMAIL = env.get("NOTIFICATION_EMAIL", "odagledesoj@gmail.com")
+NOTIFICATION_EMAIL = env.get("NOTIFICATION_EMAIL")
+if not NOTIFICATION_EMAIL:
+    print("ERROR: NOTIFICATION_EMAIL not found in .env.local")
+    sys.exit(1)
 
 if not RESEND_API_KEY:
     print("ERROR: RESEND_API_KEY not found in .env.local")
